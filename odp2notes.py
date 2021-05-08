@@ -24,12 +24,11 @@ import sys
 from odf.namespaces import TEXTNS, TABLENS, DRAWNS, PRESENTATIONNS
 from io import BytesIO, StringIO
 
-
 PAGE_HEADER = '<!-- page {page} start -->'
 PAGE_FOOTER = '<!-- page {page} end -->'
 
 def getxmlpart(odffile, xmlfile):
-    """ Get the content out of the ODT file"""
+    """ Get the content out of the ODF file"""
     z = zipfile.ZipFile(odffile)
     content = z.read(xmlfile)
     z.close()
@@ -39,8 +38,8 @@ def getxmlpart(odffile, xmlfile):
 # Extract notes part from content.xml
 #
 
-class ODTSlideHandler(handler.ContentHandler):
-    """ Extract notes from content.xml of an ODT file """
+class ODFSlideHandler(handler.ContentHandler):
+    """ Extract notes from content.xml of an ODF file """
     def __init__(self, eater):
         self.r = eater
         self.data = []
@@ -71,16 +70,16 @@ class ODTSlideHandler(handler.ContentHandler):
             self.r.append(PAGE_FOOTER.format(page = self.pagenum)) 
             self.in_notes = False # just for broken content.xml
 
-def odtnotes(odtfile):
-    mimetype = getxmlpart(odtfile,'mimetype')
-    content = getxmlpart(odtfile,'content.xml')
+def odfnotes(odffile):
+    mimetype = getxmlpart(odffile,'mimetype')
+    content = getxmlpart(odffile,'content.xml')
     lines = []
     parser = make_parser()
     parser.setFeature(handler.feature_namespaces, 1)
     
     if mimetype.decode('utf8') in ('application/vnd.oasis.opendocument.presentation',
                     'application/vnd.oasis.opendocument.presentation-template'):
-        parser.setContentHandler(ODTSlideHandler(lines))
+        parser.setContentHandler(ODFSlideHandler(lines))
     else:
         print("Unsupported fileformat")
         sys.exit(2)
@@ -98,8 +97,15 @@ if __name__ == "__main__":
         description='extract notes text from ODP file')
     parser.add_argument(metavar='input.odp',
                         dest='inputfile', help='input ODP file')
+    parser.add_argument('--ssml', action='store_true',
+                        help='insert SSML header/footer for slide2mp4')
 
     args = parser.parse_args()
+
+    if args.ssml:
+        PAGE_HEADER = '<?xml version="1.0" encoding="UTF-8"?>\n<speak version="1.1"> '
+        PAGE_FOOTER = '</speak>'
+
     with open(args.inputfile, 'rb') as f:
-        for line in odtnotes(BytesIO(f.read())):
+        for line in odfnotes(BytesIO(f.read())):
             print(line)
